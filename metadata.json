@@ -1,0 +1,5 @@
+{
+  "name": "N8N & Supabase Prototype",
+  "description": "A prototype for chatting with n8n agents after Supabase authentication.",
+  "requestFramePermissions": []
+}
