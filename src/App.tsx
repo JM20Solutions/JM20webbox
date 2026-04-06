@@ -193,7 +193,7 @@ export default function App() {
                   <Bot className="w-7 h-7" style={{ color: 'var(--accent)' }} />
                 </div>
                 <div>
-                  <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1.1 }}>JM20</h1>
+                  <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1.1, fontVariantNumeric: 'lining-nums' }}>JM20</h1>
                   <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginTop: '2px' }}>Agentic Customer Support Services</p>
                 </div>
               </div>
