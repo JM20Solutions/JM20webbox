@@ -1,8 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import {
-  Send, LogIn, LogOut, Lock, Mail,
-  Bot, AlertCircle, Loader2
-} from 'lucide-react';
+import { Send, LogOut, Bot, AlertCircle, Loader2 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 // ── CONFIGURATION ──
@@ -10,6 +7,30 @@ const SUPABASE_URL = 'https://wiavnyuchdsfztzhvaua.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpYXZueXVjaGRzZnp0emh2YXVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwMDI2ODQsImV4cCI6MjA4NjU3ODY4NH0.dXz7vyFglA_lihma__rbtBT8afZZ1YUJEkAmqpFOL6c';
 const N8N_WEBHOOK_URL = 'https://gpixie.app.n8n.cloud/webhook/73c8cf09-d134-445b-950a-94a8eccbe4f8';
 
+// ── APPLE DESIGN TOKENS ──
+const a = {
+  bgPrimary:    '#000000',
+  bgSecondary:  '#1C1C1E',
+  bgTertiary:   '#2C2C2E',
+  bgQuaternary: '#3A3A3C',
+  glassBg:      'rgba(28, 28, 30, 0.82)',
+  glassBorder:  'rgba(255, 255, 255, 0.08)',
+  textPrimary:  '#F5F5F7',
+  textSecondary:'#A1A1A6',
+  textTertiary: '#636366',
+  accent:       '#0071E3',
+  accentBlue:   '#0A84FF',
+  accentGlow:   'rgba(0, 113, 227, 0.28)',
+  green:        '#30D158',
+  red:          '#FF453A',
+  separator:    'rgba(255, 255, 255, 0.10)',
+  separatorOpaque: '#38383A',
+} as const;
+
+const SF = '-apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", Arial, sans-serif';
+const SFDisplay = '-apple-system, BlinkMacSystemFont, "SF Pro Display", "Helvetica Neue", Arial, sans-serif';
+
+// ── TYPES ──
 interface UserInfo {
   id: string;
   first_name: string;
@@ -23,6 +44,7 @@ interface ChatMsg {
   text: string;
 }
 
+// ── MARKDOWN RENDERER ──
 function renderMarkdown(text: string): React.ReactNode {
   const paragraphs = text.split(/\n\n+/);
   return paragraphs.map((para, pIdx) => {
@@ -32,11 +54,11 @@ function renderMarkdown(text: string): React.ReactNode {
     if (isList) {
       const items = lines.filter(l => l.trim().startsWith('- ') || l.trim().startsWith('* '));
       return (
-        <ul key={pIdx} className="list-none space-y-1.5 my-2">
+        <ul key={pIdx} style={{ listStyle: 'none', margin: '6px 0', padding: 0 }}>
           {items.map((item, i) => (
-            <li key={i} className="flex gap-2 items-start">
-              <span style={{ color: 'var(--accent)' }} className="mt-1 shrink-0">•</span>
-              <span>{applyInlineFormatting(item.replace(/^[-*]\s*/, ''))}</span>
+            <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', marginBottom: 4 }}>
+              <span style={{ color: a.accentBlue, flexShrink: 0, lineHeight: 1.45 }}>•</span>
+              <span>{applyInline(item.replace(/^[-*]\s*/, ''))}</span>
             </li>
           ))}
         </ul>
@@ -44,11 +66,11 @@ function renderMarkdown(text: string): React.ReactNode {
     }
 
     return (
-      <p key={pIdx} className={pIdx > 0 ? 'mt-2' : ''}>
+      <p key={pIdx} style={{ margin: pIdx > 0 ? '8px 0 0' : '0' }}>
         {lines.map((line, lIdx) => (
           <React.Fragment key={lIdx}>
             {lIdx > 0 && <br />}
-            {applyInlineFormatting(line)}
+            {applyInline(line)}
           </React.Fragment>
         ))}
       </p>
@@ -56,38 +78,38 @@ function renderMarkdown(text: string): React.ReactNode {
   });
 }
 
-function applyInlineFormatting(text: string): React.ReactNode {
+function applyInline(text: string): React.ReactNode {
   const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.map((part, i) => {
-    if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} style={{ color: 'var(--accent)', fontWeight: 600 }}>{part.slice(2, -2)}</strong>;
-    }
-    return <React.Fragment key={i}>{part}</React.Fragment>;
-  });
+  return parts.map((part, i) =>
+    part.startsWith('**') && part.endsWith('**')
+      ? <strong key={i} style={{ fontWeight: 700 }}>{part.slice(2, -2)}</strong>
+      : <React.Fragment key={i}>{part}</React.Fragment>
+  );
 }
 
+// ── APP ──
 export default function App() {
-  const [user, setUser] = useState<UserInfo | null>(null);
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [loginError, setLoginError] = useState('');
+  const [user, setUser]               = useState<UserInfo | null>(null);
+  const [loginEmail, setLoginEmail]   = useState('');
+  const [loginPwd, setLoginPwd]       = useState('');
+  const [loginError, setLoginError]   = useState('');
   const [loginLoading, setLoginLoading] = useState(false);
+  const [focused, setFocused]         = useState<string | null>(null);
 
-  const [messages, setMessages] = useState<ChatMsg[]>([]);
-  const [inputMessage, setInputMessage] = useState('');
-  const [isChatLoading, setIsChatLoading] = useState(false);
+  const [messages, setMessages]       = useState<ChatMsg[]>([]);
+  const [inputMsg, setInputMsg]       = useState('');
+  const [chatLoading, setChatLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    }
-  }, [messages, isChatLoading]);
+    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+  }, [messages, chatLoading]);
 
+  // ── HANDLERS ──
   const handleLogin = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
-    if (!loginEmail.trim() || !loginPassword.trim()) {
-      setLoginError('Please enter both email and password.');
+    if (!loginEmail.trim() || !loginPwd.trim()) {
+      setLoginError('Please enter your email and password.');
       return;
     }
     setLoginLoading(true);
@@ -95,20 +117,20 @@ export default function App() {
     try {
       const res = await fetch(
         `${SUPABASE_URL}/rest/v1/customers?email=eq.${encodeURIComponent(loginEmail.trim())}&select=id,first_name,last_name,email,password`,
-        { headers: { 'apikey': SUPABASE_ANON_KEY, 'Authorization': `Bearer ${SUPABASE_ANON_KEY}` } }
+        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
       );
       const data = await res.json();
       if (data.length === 0) {
-        setLoginError('Account not found.');
-      } else if (data[0].password !== loginPassword) {
-        setLoginError('Incorrect password.');
+        setLoginError('No account found with that email.');
+      } else if (data[0].password !== loginPwd) {
+        setLoginError('Incorrect password. Please try again.');
       } else {
-        const { password: _, ...userData } = data[0];
+        const { password: _pw, ...userData } = data[0];
         setUser(userData);
         setMessages([{ id: 'welcome', role: 'agent', text: `Hello ${userData.first_name}! How can I help you today?` }]);
       }
-    } catch (err) {
-      setLoginError('Connection error. Please check your Supabase URL and Key.');
+    } catch {
+      setLoginError('Connection error. Please check your network.');
     } finally {
       setLoginLoading(false);
     }
@@ -118,195 +140,414 @@ export default function App() {
     setUser(null);
     setMessages([]);
     setLoginEmail('');
-    setLoginPassword('');
+    setLoginPwd('');
   };
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isChatLoading) return;
-    const userText = inputMessage.trim();
-    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text: userText }]);
-    setInputMessage('');
-    setIsChatLoading(true);
+  const handleSend = async () => {
+    if (!inputMsg.trim() || chatLoading) return;
+    const text = inputMsg.trim();
+    setMessages(prev => [...prev, { id: Date.now().toString(), role: 'user', text }]);
+    setInputMsg('');
+    setChatLoading(true);
     try {
-      const response = await fetch(N8N_WEBHOOK_URL, {
+      const res = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'sendMessage', chatInput: userText, customer_id: user?.id || '' })
+        body: JSON.stringify({ action: 'sendMessage', chatInput: text, customer_id: user?.id ?? '' }),
       });
-      const data = await response.json();
-      const reply = data.output || data.text || data.response || data.message || JSON.stringify(data);
+      const data = await res.json();
+      const reply = data.output ?? data.text ?? data.response ?? data.message ?? JSON.stringify(data);
       setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'agent', text: reply }]);
-    } catch (err) {
-      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'system', text: 'Error connecting to n8n. Please check your webhook URL.' }]);
+    } catch {
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'system', text: 'Failed to send. Please try again.' }]);
     } finally {
-      setIsChatLoading(false);
+      setChatLoading(false);
     }
   };
 
+  // ── SHARED STYLES ──
+  const field = (name: string): React.CSSProperties => ({
+    width: '100%',
+    padding: '14px 16px',
+    background: a.bgTertiary,
+    border: `1px solid ${focused === name ? a.accentBlue : 'rgba(255,255,255,0.06)'}`,
+    borderRadius: 12,
+    color: a.textPrimary,
+    fontSize: 15,
+    fontFamily: SF,
+    outline: 'none',
+    transition: 'border-color 0.18s ease',
+    boxSizing: 'border-box',
+    WebkitAppearance: 'none',
+  });
+
+  // ── RENDER ──
   return (
-    <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)', color: 'var(--text)' }}>
+    <div style={{
+      minHeight: '100vh',
+      background: a.bgPrimary,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: 20,
+      fontFamily: SF,
+    }}>
       <AnimatePresence mode="wait">
+
+        {/* ════════════════════════════════════════
+            LOGIN SCREEN
+        ════════════════════════════════════════ */}
         {!user ? (
           <motion.div
             key="login"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="w-full max-w-md overflow-hidden"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}
+            initial={{ opacity: 0, scale: 0.96, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.96, y: -16 }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+            style={{
+              width: '100%',
+              maxWidth: 400,
+              background: a.glassBg,
+              backdropFilter: 'blur(48px)',
+              WebkitBackdropFilter: 'blur(48px)',
+              border: `1px solid ${a.glassBorder}`,
+              borderRadius: 20,
+              boxShadow: '0 32px 96px rgba(0,0,0,0.85), 0 0 0 0.5px rgba(255,255,255,0.04)',
+              overflow: 'hidden',
+            }}
           >
-            <div className="p-8 relative overflow-hidden" style={{ background: 'var(--surface2)', borderBottom: '1px solid var(--border)' }}>
-              <div className="absolute top-0 right-0 w-48 h-48 rounded-full -translate-x-8 -translate-y-16" style={{ background: 'var(--accent-glow)' }} />
-              <div className="relative z-10 flex items-center gap-5">
-                <div className="w-14 h-14 flex items-center justify-center shrink-0" style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent-dim)', borderRadius: 'var(--radius)', boxShadow: '0 0 20px var(--accent-glow)' }}>
-                  <Bot className="w-7 h-7" style={{ color: 'var(--accent)' }} />
-                </div>
-                <div>
-                  <h1 style={{ fontFamily: 'var(--display)', fontSize: '1.6rem', fontWeight: 800, color: 'var(--text)', lineHeight: 1.1, fontVariantNumeric: 'lining-nums' }}>JM20</h1>
-                  <p style={{ color: 'var(--text-dim)', fontSize: '0.85rem', marginTop: '2px' }}>Agentic Customer Support Services</p>
-                </div>
+            {/* Header */}
+            <div style={{ padding: '48px 40px 32px', textAlign: 'center' }}>
+              {/* Icon */}
+              <div style={{
+                width: 80, height: 80, borderRadius: '50%',
+                background: 'linear-gradient(150deg, #1a8cff 0%, #0050c8 100%)',
+                margin: '0 auto 28px',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                boxShadow: `0 12px 40px ${a.accentGlow}, 0 0 0 1px rgba(255,255,255,0.1) inset`,
+              }}>
+                <Bot style={{ width: 42, height: 42, color: '#fff' }} />
               </div>
+              <h1 style={{
+                fontFamily: SFDisplay,
+                fontSize: 28, fontWeight: 700,
+                color: a.textPrimary,
+                letterSpacing: '-0.5px',
+                margin: '0 0 8px',
+              }}>
+                JM20 Support
+              </h1>
+              <p style={{ color: a.textSecondary, fontSize: 15, margin: 0 }}>
+                Sign in to your account
+              </p>
             </div>
 
-            <form onSubmit={handleLogin} className="p-8 space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block mb-2" style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>Email Address</label>
-                  <div className="flex items-center gap-3 px-4 py-3" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                    <Mail className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                    <input
-                      type="email"
-                      value={loginEmail}
-                      onChange={(e) => setLoginEmail(e.target.value)}
-                      placeholder="name@example.com"
-                      className="flex-grow bg-transparent border-none text-sm outline-none"
-                      style={{ color: 'var(--text)', caretColor: 'var(--accent)' }}
-                    />
-                  </div>
-                </div>
-                <div>
-                  <label className="block mb-2" style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>Password</label>
-                  <div className="flex items-center gap-3 px-4 py-3" style={{ background: 'var(--surface2)', border: '1px solid var(--border)', borderRadius: 'var(--radius)' }}>
-                    <Lock className="w-4 h-4 shrink-0" style={{ color: 'var(--text-muted)' }} />
-                    <input
-                      type="password"
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="flex-grow bg-transparent border-none text-sm outline-none"
-                      style={{ color: 'var(--text)', caretColor: 'var(--accent)' }}
-                    />
-                  </div>
-                </div>
+            {/* Form */}
+            <form onSubmit={handleLogin} style={{ padding: '0 40px 44px' }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 14 }}>
+                <input
+                  type="email"
+                  value={loginEmail}
+                  onChange={e => setLoginEmail(e.target.value)}
+                  onFocus={() => setFocused('email')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="Email"
+                  autoComplete="email"
+                  style={field('email')}
+                />
+                <input
+                  type="password"
+                  value={loginPwd}
+                  onChange={e => setLoginPwd(e.target.value)}
+                  onFocus={() => setFocused('password')}
+                  onBlur={() => setFocused(null)}
+                  placeholder="Password"
+                  autoComplete="current-password"
+                  style={field('password')}
+                />
               </div>
 
-              {loginError && (
-                <motion.div
-                  initial={{ opacity: 0, x: -10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  className="flex items-center gap-2 p-3 text-xs font-medium"
-                  style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', borderRadius: 'var(--radius)', color: 'var(--red)' }}
-                >
-                  <AlertCircle className="w-4 h-4 shrink-0" />
-                  {loginError}
-                </motion.div>
-              )}
+              <AnimatePresence>
+                {loginError && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    animate={{ opacity: 1, height: 'auto', marginBottom: 14 }}
+                    exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                    style={{ overflow: 'hidden' }}
+                  >
+                    <div style={{
+                      display: 'flex', alignItems: 'center', gap: 8,
+                      padding: '10px 14px',
+                      background: 'rgba(255, 69, 58, 0.12)',
+                      border: '1px solid rgba(255, 69, 58, 0.24)',
+                      borderRadius: 10,
+                      color: a.red,
+                      fontSize: 13,
+                    }}>
+                      <AlertCircle style={{ width: 15, height: 15, flexShrink: 0 }} />
+                      {loginError}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
 
               <button
                 type="submit"
                 disabled={loginLoading}
-                className="w-full py-3 font-bold text-sm flex items-center justify-center gap-2 transition-opacity disabled:opacity-50"
-                style={{ background: 'var(--accent)', color: '#080c14', borderRadius: 'var(--radius)', boxShadow: '0 4px 20px var(--accent-glow)' }}
+                style={{
+                  width: '100%',
+                  padding: '14px',
+                  background: loginLoading ? 'rgba(0,113,227,0.65)' : a.accent,
+                  color: '#fff',
+                  border: 'none',
+                  borderRadius: 12,
+                  fontSize: 17,
+                  fontWeight: 600,
+                  fontFamily: SF,
+                  letterSpacing: '-0.1px',
+                  cursor: loginLoading ? 'default' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  transition: 'background 0.2s ease',
+                }}
               >
-                {loginLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <LogIn className="w-4 h-4" />}
-                Sign In
+                {loginLoading && <Loader2 style={{ width: 17, height: 17 }} className="animate-spin" />}
+                {loginLoading ? 'Signing In…' : 'Sign In'}
               </button>
             </form>
           </motion.div>
+
         ) : (
+
+          /* ════════════════════════════════════════
+              CHAT SCREEN
+          ════════════════════════════════════════ */
           <motion.div
             key="chat"
-            initial={{ opacity: 0, scale: 0.95 }}
+            initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden"
-            style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 'var(--radius-lg)', boxShadow: '0 25px 60px rgba(0,0,0,0.6)' }}
+            transition={{ type: 'spring', stiffness: 380, damping: 28 }}
+            style={{
+              width: '100%',
+              maxWidth: 680,
+              height: '84vh',
+              maxHeight: 740,
+              display: 'flex',
+              flexDirection: 'column',
+              background: a.glassBg,
+              backdropFilter: 'blur(48px)',
+              WebkitBackdropFilter: 'blur(48px)',
+              border: `1px solid ${a.glassBorder}`,
+              borderRadius: 20,
+              boxShadow: '0 32px 96px rgba(0,0,0,0.85), 0 0 0 0.5px rgba(255,255,255,0.04)',
+              overflow: 'hidden',
+            }}
           >
-            <div className="p-5 flex justify-between items-center shrink-0" style={{ background: 'var(--surface2)', borderBottom: '1px solid var(--border)' }}>
-              <div className="flex items-center gap-4">
-                <div className="w-10 h-10 flex items-center justify-center" style={{ background: 'var(--accent-glow)', border: '1px solid var(--accent-dim)', borderRadius: 'var(--radius)' }}>
-                  <Bot className="w-5 h-5" style={{ color: 'var(--accent)' }} />
+            {/* ── Nav Bar ── */}
+            <div style={{
+              padding: '14px 20px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              borderBottom: `1px solid ${a.separator}`,
+              background: 'rgba(28,28,30,0.65)',
+              backdropFilter: 'blur(24px)',
+              flexShrink: 0,
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                {/* Avatar */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: '50%',
+                  background: 'linear-gradient(150deg, #1a8cff 0%, #0050c8 100%)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: `0 4px 14px ${a.accentGlow}`,
+                  flexShrink: 0,
+                }}>
+                  <Bot style={{ width: 21, height: 21, color: '#fff' }} />
                 </div>
                 <div>
-                  <h2 style={{ fontFamily: 'var(--display)', fontWeight: 800, fontSize: '1rem', color: 'var(--text)', lineHeight: 1 }}>JM20 Agentic Support</h2>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="w-2 h-2 rounded-full animate-pulse" style={{ background: 'var(--green)' }} />
-                    <span style={{ fontSize: '0.65rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', color: 'var(--text-muted)' }}>Connected as {user.first_name}</span>
+                  <div style={{
+                    fontFamily: SFDisplay,
+                    fontSize: 15, fontWeight: 600,
+                    color: a.textPrimary,
+                    letterSpacing: '-0.2px',
+                    lineHeight: 1.2,
+                  }}>
+                    JM20 Support
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 3 }}>
+                    <span style={{
+                      width: 7, height: 7, borderRadius: '50%',
+                      background: a.green,
+                      boxShadow: `0 0 6px ${a.green}88`,
+                      display: 'inline-block',
+                      flexShrink: 0,
+                    }} />
+                    <span style={{ fontSize: 12, color: a.textSecondary }}>
+                      {user.first_name} {user.last_name}
+                    </span>
                   </div>
                 </div>
               </div>
-              <button onClick={handleLogout} className="p-2 rounded-lg" style={{ color: 'var(--text-muted)' }} title="Logout">
-                <LogOut className="w-5 h-5" />
+
+              <button
+                onClick={handleLogout}
+                style={{
+                  padding: '6px 14px',
+                  background: 'rgba(255,255,255,0.06)',
+                  border: `1px solid ${a.separator}`,
+                  borderRadius: 8,
+                  color: a.textSecondary,
+                  fontSize: 13,
+                  fontFamily: SF,
+                  cursor: 'pointer',
+                  display: 'flex', alignItems: 'center', gap: 6,
+                }}
+              >
+                <LogOut style={{ width: 13, height: 13 }} />
+                Sign Out
               </button>
             </div>
 
-            <div ref={scrollRef} className="flex-1 overflow-y-auto p-5 space-y-4" style={{ background: 'var(--bg)' }}>
-              {messages.map((m) => (
-                <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  <div
-                    className={`max-w-[85%] px-4 py-3 text-sm leading-relaxed ${
-                      m.role === 'user' ? 'rounded-2xl rounded-tr-none'
-                      : m.role === 'system' ? 'w-full text-center italic text-xs rounded-xl'
-                      : 'rounded-2xl rounded-tl-none'
-                    }`}
-                    style={
-                      m.role === 'user'
-                        ? { background: 'var(--accent)', color: '#080c14', fontWeight: 500 }
-                        : m.role === 'system'
-                        ? { background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.25)', color: 'var(--red)' }
-                        : { background: 'var(--surface2)', border: '1px solid var(--border)', color: 'var(--text)' }
-                    }
-                  >
-                    {m.role === 'agent' ? renderMarkdown(m.text) : m.text}
-                  </div>
-                </div>
-              ))}
-              {isChatLoading && (
-                <div className="flex justify-start">
-                  <div className="px-5 py-4 rounded-2xl rounded-tl-none" style={{ background: 'var(--surface2)', border: '1px solid var(--border)' }}>
-                    <div className="flex space-x-1.5">
-                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ background: 'var(--accent)', animationDelay: '0ms' }} />
-                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ background: 'var(--accent)', animationDelay: '150ms' }} />
-                      <div className="w-2 h-2 rounded-full animate-bounce" style={{ background: 'var(--accent)', animationDelay: '300ms' }} />
+            {/* ── Messages ── */}
+            <div
+              ref={scrollRef}
+              style={{
+                flex: 1,
+                overflowY: 'auto',
+                padding: '20px 18px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: 2,
+                background: a.bgPrimary,
+              }}
+            >
+              {messages.map((m, idx) => {
+                const isUser   = m.role === 'user';
+                const isSystem = m.role === 'system';
+                const groupGap = idx > 0 && messages[idx - 1].role !== m.role;
+
+                if (isSystem) {
+                  return (
+                    <div key={m.id} style={{
+                      alignSelf: 'center',
+                      padding: '7px 14px',
+                      background: 'rgba(255,69,58,0.12)',
+                      border: '1px solid rgba(255,69,58,0.22)',
+                      borderRadius: 10,
+                      color: a.red,
+                      fontSize: 12,
+                      margin: '8px 0',
+                    }}>
+                      {m.text}
                     </div>
+                  );
+                }
+
+                return (
+                  <div key={m.id} style={{
+                    display: 'flex',
+                    justifyContent: isUser ? 'flex-end' : 'flex-start',
+                    marginTop: groupGap ? 14 : 2,
+                  }}>
+                    <div style={{
+                      maxWidth: '72%',
+                      padding: '10px 14px',
+                      /* iMessage-style bubble radius */
+                      borderRadius: isUser
+                        ? '18px 18px 4px 18px'
+                        : '18px 18px 18px 4px',
+                      background: isUser ? a.accentBlue : a.bgTertiary,
+                      color: a.textPrimary,
+                      fontSize: 15,
+                      lineHeight: 1.45,
+                    }}>
+                      {m.role === 'agent' ? renderMarkdown(m.text) : m.text}
+                    </div>
+                  </div>
+                );
+              })}
+
+              {/* Typing indicator */}
+              {chatLoading && (
+                <div style={{
+                  display: 'flex', justifyContent: 'flex-start',
+                  marginTop: messages.length > 0 && messages[messages.length - 1].role !== 'agent' ? 14 : 2,
+                }}>
+                  <div style={{
+                    padding: '13px 18px',
+                    background: a.bgTertiary,
+                    borderRadius: '18px 18px 18px 4px',
+                    display: 'flex', gap: 6, alignItems: 'center',
+                  }}>
+                    {[0, 160, 320].map((delay, i) => (
+                      <span key={i} style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: a.textTertiary,
+                        display: 'inline-block',
+                        animation: `bounce-dot 1.3s ease-in-out infinite`,
+                        animationDelay: `${delay}ms`,
+                      }} />
+                    ))}
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="p-4" style={{ borderTop: '1px solid var(--border)', background: 'var(--surface2)' }}>
-              <div className="flex items-center gap-3 px-4 py-2" style={{ background: 'var(--bg)', border: '1px solid var(--border2)', borderRadius: 'var(--radius)' }}>
+            {/* ── Input Bar ── */}
+            <div style={{
+              padding: '12px 16px',
+              borderTop: `1px solid ${a.separator}`,
+              background: 'rgba(28,28,30,0.85)',
+              backdropFilter: 'blur(24px)',
+              flexShrink: 0,
+            }}>
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 10,
+                background: a.bgTertiary,
+                borderRadius: 22,
+                padding: '8px 8px 8px 18px',
+                border: `1px solid ${a.separator}`,
+              }}>
                 <input
                   type="text"
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Type your message..."
-                  disabled={isChatLoading}
-                  className="flex-grow bg-transparent border-none py-2 text-sm outline-none disabled:opacity-50"
-                  style={{ color: 'var(--text)', caretColor: 'var(--accent)' }}
+                  value={inputMsg}
+                  onChange={e => setInputMsg(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && handleSend()}
+                  placeholder="Message…"
+                  disabled={chatLoading}
+                  style={{
+                    flex: 1,
+                    background: 'transparent',
+                    border: 'none', outline: 'none',
+                    color: a.textPrimary,
+                    fontSize: 15,
+                    fontFamily: SF,
+                    padding: '4px 0',
+                    opacity: chatLoading ? 0.5 : 1,
+                  }}
                 />
                 <button
-                  onClick={handleSendMessage}
-                  disabled={isChatLoading || !inputMessage.trim()}
-                  className="w-9 h-9 flex items-center justify-center shrink-0 transition-opacity disabled:opacity-40"
-                  style={{ background: 'var(--accent)', color: '#080c14', borderRadius: 'var(--radius)' }}
+                  onClick={handleSend}
+                  disabled={chatLoading || !inputMsg.trim()}
+                  style={{
+                    width: 34, height: 34, borderRadius: '50%',
+                    background: (!chatLoading && inputMsg.trim()) ? a.accentBlue : a.bgQuaternary,
+                    border: 'none',
+                    cursor: (!chatLoading && inputMsg.trim()) ? 'pointer' : 'default',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0,
+                    transition: 'background 0.2s ease',
+                  }}
                 >
-                  <Send className="w-4 h-4" />
+                  <Send style={{
+                    width: 15, height: 15,
+                    color: (!chatLoading && inputMsg.trim()) ? '#fff' : a.textTertiary,
+                    transition: 'color 0.2s ease',
+                  }} />
                 </button>
               </div>
             </div>
           </motion.div>
         )}
+
       </AnimatePresence>
     </div>
   );
