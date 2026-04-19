@@ -95,7 +95,10 @@ export default function App() {
     try {
       const res = await fetch(N8N_WEBHOOK_URL, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+  'Content-Type': 'application/json',
+  'Authorization': 'Bearer TEST_TOKEN'
+},
         body: JSON.stringify({ action: 'sendMessage', chatInput: txt, customer_id: user?.id ?? '' }),
       });
       const raw = await res.text();
