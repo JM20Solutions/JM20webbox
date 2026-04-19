@@ -80,28 +80,33 @@ const login = async (e: React.FormEvent) => {
   setLoginLoading(true);
   setLoginErr('');
   try {
-    const { data, error } = await supabase
+    // Step 1: Real JWT login via Supabase Auth
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: pwd,
+    });
+    if (error) {
+      setLoginErr(error.message);
+      return;
+    }
+    // Step 2: Store the REAL JWT token for n8n
+    localStorage.setItem("sb_token", data.session.access_token);
+
+    // Step 3: Get their details from your customers table
+    const { data: customer } = await supabase
       .from('customers')
       .select('*')
       .eq('email', email.trim())
-      .eq('password', pwd)
       .single();
 
-    if (error || !data) {
-      setLoginErr('Invalid email or password.');
-      return;
-    }
-    // simple token for n8n webhook
-    localStorage.setItem("sb_token", data.id);
-    setUser(data);
-    setMessages([{ id: 'w', role: 'agent', text: `Hello ${data.first_name}! How can I help you today?` }]);
+    setUser(customer);
+    setMessages([{ id: 'w', role: 'agent', text: `Hello ${customer.first_name}! How can I help you today?` }]);
   } catch (err) {
     setLoginErr('Connection error. Please try again.');
   } finally {
     setLoginLoading(false);
   }
 };
-    
   // ── SEND ──
   const send = async () => {
     if (!input.trim() || sending) return;
