@@ -1,6 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, LogOut, Bot, AlertCircle, Loader2 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
 
 // ── CONFIG ──
 const SUPABASE_URL      = 'https://wiavnyuchdsfztzhvaua.supabase.co';
@@ -64,50 +63,40 @@ export default function App() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, sending]);
-
+const logout = () => {
+  localStorage.removeItem("sb_token");
+  setUser(null);
+  setMessages([]);
+  setEmail('');
+  setPwd('');
+};
   // ── LOGIN ──
- const login = async (e: React.FormEvent) => {
+const login = async (e: React.FormEvent) => {
   e.preventDefault();
-
   if (!email.trim() || !pwd.trim()) {
     setLoginErr('Please enter your email and password.');
     return;
   }
-
   setLoginLoading(true);
   setLoginErr('');
-
   try {
-    // ✅ REAL SUPABASE AUTH (this generates JWT)
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email: email.trim(),
-      password: pwd,
-    });
+    const { data, error } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('email', email.trim())
+      .eq('password', pwd)
+      .single();
 
-    if (error) {
-      setLoginErr(error.message);
+    if (error || !data) {
+      setLoginErr('Invalid email or password.');
       return;
     }
-
-    // ✅ JWT TOKEN (this is what you need for n8n)
-    const token = data.session.access_token;
-
-    // store token for later webhook calls
-    localStorage.setItem("sb_token", token);
-
-    // set user in UI
-    setUser(data.user);
-
-    setMessages([
-      {
-        id: 'w',
-        role: 'agent',
-        text: `Hello ${data.user.email}! How can I help you today?`
-      }
-    ]);
-
+    // simple token for n8n webhook
+    localStorage.setItem("sb_token", data.id);
+    setUser(data);
+    setMessages([{ id: 'w', role: 'agent', text: `Hello ${data.first_name}! How can I help you today?` }]);
   } catch (err) {
-    setLoginErr(err instanceof Error ? err.message : 'Connection error. Please try again.');
+    setLoginErr('Connection error. Please try again.');
   } finally {
     setLoginLoading(false);
   }
