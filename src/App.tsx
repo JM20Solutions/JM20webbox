@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, LogOut, Bot, AlertCircle, Loader2 } from 'lucide-react';
+import { createClient } from '@supabase/supabase-js';
 
 // ── CONFIG ──
 const SUPABASE_URL      = 'https://wiavnyuchdsfztzhvaua.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6IndpYXZueXVjaGRzZnp0emh2YXVhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzEwMDI2ODQsImV4cCI6MjA4NjU3ODY4NH0.dXz7vyFglA_lihma__rbtBT8afZZ1YUJEkAmqpFOL6c';
 const N8N_WEBHOOK_URL   = 'https://gpixie.app.n8n.cloud/webhook/91e1a5ca-40b7-4792-bbcb-df9965a06ffe';
+
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 // ── TYPES ──
 interface UserInfo { id: string; first_name: string; last_name: string; email: string; }
@@ -61,31 +66,53 @@ export default function App() {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, sending]);
 
   // ── LOGIN ──
-  const login = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!email.trim() || !pwd.trim()) { setLoginErr('Please enter your email and password.'); return; }
-    setLoginLoading(true); setLoginErr('');
-    try {
-      const res = await fetch(
-        `${SUPABASE_URL}/rest/v1/customers?email=eq.${encodeURIComponent(email.trim())}&select=id,first_name,last_name,email,password`,
-        { headers: { apikey: SUPABASE_ANON_KEY, Authorization: `Bearer ${SUPABASE_ANON_KEY}` } }
-      );
-      if (!res.ok) throw new Error(`Server error ${res.status}`);
-      const data = await res.json();
-      if (!data.length)                  setLoginErr('No account found with this email.');
-      else if (data[0].password !== pwd) setLoginErr('Incorrect password. Please try again.');
-      else {
-        const { password: _, ...u } = data[0];
-        setUser(u);
-        setMessages([{ id: 'w', role: 'agent', text: `Hello ${u.first_name}! How can I help you today?` }]);
+ const login = async (e: React.FormEvent) => {
+  e.preventDefault();
+
+  if (!email.trim() || !pwd.trim()) {
+    setLoginErr('Please enter your email and password.');
+    return;
+  }
+
+  setLoginLoading(true);
+  setLoginErr('');
+
+  try {
+    // ✅ REAL SUPABASE AUTH (this generates JWT)
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password: pwd,
+    });
+
+    if (error) {
+      setLoginErr(error.message);
+      return;
+    }
+
+    // ✅ JWT TOKEN (this is what you need for n8n)
+    const token = data.session.access_token;
+
+    // store token for later webhook calls
+    localStorage.setItem("sb_token", token);
+
+    // set user in UI
+    setUser(data.user);
+
+    setMessages([
+      {
+        id: 'w',
+        role: 'agent',
+        text: `Hello ${data.user.email}! How can I help you today?`
       }
-    } catch (err) {
-      setLoginErr(err instanceof Error ? err.message : 'Connection error. Please try again.');
-    } finally { setLoginLoading(false); }
-  };
+    ]);
 
-  const logout = () => { setUser(null); setMessages([]); setEmail(''); setPwd(''); };
-
+  } catch (err) {
+    setLoginErr(err instanceof Error ? err.message : 'Connection error. Please try again.');
+  } finally {
+    setLoginLoading(false);
+  }
+};
+    
   // ── SEND ──
   const send = async () => {
     if (!input.trim() || sending) return;
@@ -97,7 +124,7 @@ export default function App() {
         method: 'POST',
         headers: {
   'Content-Type': 'application/json',
-  'Authorization': 'Bearer TEST_TOKEN'
+  'Authorization': `Bearer ${localStorage.getItem("sb_token") || ''}`
 },
         body: JSON.stringify({ action: 'sendMessage', chatInput: txt, customer_id: user?.id ?? '' }),
       });
